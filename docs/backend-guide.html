@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>the-scheduler 백엔드 리딩 가이드</title>
+<style>
+  :root {
+    --bg: #fbfafd;
+    --panel: #ffffff;
+    --ink: #1b1826;
+    --muted: #6a6579;
+    --faint: #918ca1;
+    --border: #e7e3ef;
+    --border-strong: #d6d0e4;
+    --accent: #6d3fe0;
+    --accent-soft: #f0eafc;
+    --green: #15803d;
+    --green-soft: #e7f4ec;
+    --amber: #a15c07;
+    --amber-soft: #f8efdd;
+    --code-bg: #f4f1fa;
+    --code-ink: #2c2440;
+    --diagram-bg: #f6f4fb;
+    --shadow: 0 1px 2px rgba(27, 24, 38, .04), 0 8px 24px rgba(27, 24, 38, .05);
+    --mono: ui-monospace, "Cascadia Code", "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+    --sans: "Segoe UI", -apple-system, BlinkMacSystemFont, "Malgun Gothic", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0d16;
+      --panel: #17141f;
+      --ink: #ece9f4;
+      --muted: #a49eb6;
+      --faint: #7d7791;
+      --border: #262133;
+      --border-strong: #342d47;
+      --accent: #a583f5;
+      --accent-soft: #221a38;
+      --green: #4ade80;
+      --green-soft: #16251b;
+      --amber: #fbbf24;
+      --amber-soft: #2a2213;
+      --code-bg: #1d1929;
+      --code-ink: #d9d3ea;
+      --diagram-bg: #f6f4fb;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfafd; --panel: #ffffff; --ink: #1b1826; --muted: #6a6579; --faint: #918ca1;
+    --border: #e7e3ef; --border-strong: #d6d0e4; --accent: #6d3fe0; --accent-soft: #f0eafc;
+    --green: #15803d; --green-soft: #e7f4ec; --amber: #a15c07; --amber-soft: #f8efdd;
+    --code-bg: #f4f1fa; --code-ink: #2c2440; --diagram-bg: #f6f4fb;
+    --shadow: 0 1px 2px rgba(27,24,38,.04), 0 8px 24px rgba(27,24,38,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f0d16; --panel: #17141f; --ink: #ece9f4; --muted: #a49eb6; --faint: #7d7791;
+    --border: #262133; --border-strong: #342d47; --accent: #a583f5; --accent-soft: #221a38;
+    --green: #4ade80; --green-soft: #16251b; --amber: #fbbf24; --amber-soft: #2a2213;
+    --code-bg: #1d1929; --code-ink: #d9d3ea; --diagram-bg: #f6f4fb;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  /* ---- hero ---- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 12px 0 14px;
+    letter-spacing: -.02em; text-wrap: balance; font-weight: 800;
+  }
+  .lede { font-size: 18px; color: var(--muted); max-width: 62ch; margin: 0; }
+  .meta {
+    margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px;
+    font-family: var(--mono); font-size: 12.5px;
+  }
+  .tag {
+    border: 1px solid var(--border-strong); border-radius: 999px;
+    padding: 4px 11px; color: var(--muted); background: var(--panel);
+  }
+
+  /* ---- sections ---- */
+  section { margin-top: 52px; scroll-margin-top: 20px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .sec-num { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+  h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; font-weight: 750; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; letter-spacing: -.005em; }
+  p { margin: 12px 0; max-width: 68ch; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+  a:hover { border-bottom-color: var(--accent); }
+  code:not(pre code) {
+    font-family: var(--mono); font-size: .88em; background: var(--code-bg);
+    color: var(--code-ink); padding: 1.5px 6px; border-radius: 5px;
+    border: 1px solid var(--border);
+  }
+
+  /* ---- code blocks ---- */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px; overflow-x: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.6;
+    color: var(--code-ink); margin: 16px 0;
+  }
+  pre .c { color: var(--faint); font-style: italic; }
+  pre .k { color: var(--accent); font-weight: 600; }
+  pre .s { color: var(--green); }
+
+  /* ---- tables ---- */
+  .tbl-scroll { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+    background: var(--panel); position: sticky; top: 0;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .col-mono td:first-child code { color: var(--accent); }
+
+  /* ---- callout ---- */
+  .note {
+    border-radius: 12px; padding: 14px 18px; margin: 18px 0;
+    border: 1px solid var(--border); background: var(--panel); box-shadow: var(--shadow);
+  }
+  .note.take { background: var(--amber-soft); border-color: transparent; }
+  .note.good { background: var(--green-soft); border-color: transparent; }
+  .note b { font-weight: 700; }
+  .note .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .note.take .lbl { color: var(--amber); }
+  .note.good .lbl { color: var(--green); }
+
+  /* ---- flow ---- */
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 20px 0; }
+  .flow .step {
+    flex: 1 1 120px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 13px; box-shadow: var(--shadow);
+  }
+  .flow .step .n { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .flow .step .t { font-weight: 650; font-size: 14px; margin-top: 3px; }
+  .flow .step .d { font-size: 12.5px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+  .arrow { align-self: center; color: var(--faint); font-size: 18px; }
+
+  /* ---- ERD panel ---- */
+  .diagram {
+    background: var(--diagram-bg); border: 1px solid var(--border-strong);
+    border-radius: 14px; padding: 10px; margin: 18px 0; overflow-x: auto;
+  }
+  .diagram .mermaid { min-width: 720px; }
+  .cap { font-size: 12.5px; color: var(--muted); font-family: var(--mono); margin-top: 6px; }
+
+  ul.clean { padding-left: 20px; }
+  ul.clean li { margin: 7px 0; max-width: 66ch; }
+  .kicker { font-weight: 700; }
+  hr.soft { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: "neutral" });</script>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Backend Reading Guide</span>
+    <h1>the-scheduler 백엔드를 읽기 위한 지도</h1>
+    <p class="lede">자바는 아는데 TypeScript · NestJS는 처음인 사람을 위한 정리 — 문법 대응표, Nest 핵심 개념, 이 프로젝트의 구조, 그리고 DB 전체 ERD.</p>
+    <div class="meta">
+      <span class="tag">NestJS 10</span>
+      <span class="tag">TypeORM · MySQL</span>
+      <span class="tag">JWT 인증</span>
+      <span class="tag">모듈러 모놀리식</span>
+      <span class="tag">9 tables</span>
+    </div>
+  </header>
+
+  <!-- 1. TS for Java -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>자바 개발자용 TypeScript 속성 정리</h2></div>
+    <p>TS는 “타입이 붙은 JavaScript”야. 클래스·인터페이스·제네릭·데코레이터 같은 건 자바와 거의 대응되고, 대신 <span class="kicker">타입은 컴파일 때만 존재</span>하고 런타임엔 사라진다는 게 가장 큰 차이야 (그래서 Nest가 데코레이터로 런타임 메타데이터를 따로 심어).</p>
+
+    <div class="tbl-scroll">
+      <table class="col-mono">
+        <thead><tr><th>TypeScript</th><th>자바에서는</th><th>메모</th></tr></thead>
+        <tbody>
+          <tr><td><code>interface User { id: number }</code></td><td>interface / DTO</td><td>필드 모양만 정의. 런타임에 사라짐</td></tr>
+          <tr><td><code>type A = X | Y</code></td><td>(없음)</td><td>유니온 타입 — “X 또는 Y”</td></tr>
+          <tr><td><code>string | null</code></td><td><code>@Nullable String</code></td><td>null 가능 여부를 타입에 명시</td></tr>
+          <tr><td><code>x?: number</code></td><td>Optional</td><td>있어도 되고 없어도 되는 필드</td></tr>
+          <tr><td><code>Partial&lt;Task&gt;</code></td><td>제네릭</td><td>Task의 모든 필드를 optional로 (부분 수정용)</td></tr>
+          <tr><td><code>obj?.field</code></td><td>Optional.map</td><td>null이면 그냥 undefined 반환 (NPE 안 남)</td></tr>
+          <tr><td><code>a ?? b</code></td><td>a != null ? a : b</td><td>a가 null/undefined일 때만 b</td></tr>
+          <tr><td><code>const f = (x) =&gt; x + 1</code></td><td>람다 <code>x -&gt; x+1</code></td><td>화살표 함수</td></tr>
+          <tr><td><code>async / await</code></td><td>CompletableFuture</td><td>비동기. <code>await</code>=결과 나올 때까지 대기</td></tr>
+          <tr><td><code>@Injectable()</code></td><td><code>@Service</code></td><td>데코레이터 = 자바 애너테이션</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="lbl">한 번에 이해</span>
+      <b>데코레이터(<code>@Controller</code>, <code>@Column</code> …)</b>가 자바 애너테이션과 같은 역할이야. Nest·TypeORM은 전부 이 데코레이터로 돌아가. 자바 스프링을 안다면 개념이 거의 1:1로 매핑돼.
+    </div>
+  </section>
+
+  <!-- 2. Nest concepts -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>NestJS 핵심 개념 6가지</h2></div>
+    <p>Nest는 구조가 <span class="kicker">스프링과 매우 닮았어</span> — DI 컨테이너, 계층 분리, 데코레이터 기반. 아래 6개만 잡으면 이 코드 전부 읽혀.</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>개념</th><th>하는 일</th><th>스프링 대응</th><th>이 프로젝트 예시</th></tr></thead>
+        <tbody>
+          <tr><td><b>Module</b></td><td>관련된 것들을 묶는 상자. 앱은 모듈의 트리</td><td><code>@Configuration</code> / 패키지</td><td><code>TasksModule</code>, <code>AuthModule</code></td></tr>
+          <tr><td><b>Controller</b></td><td>HTTP 경로 → 메서드 매핑</td><td><code>@RestController</code></td><td><code>MemoItemsController</code></td></tr>
+          <tr><td><b>Provider/Service</b></td><td>비즈니스 로직. DI로 주입</td><td><code>@Service</code></td><td><code>TasksService</code>, <code>AuthService</code></td></tr>
+          <tr><td><b>Repository</b></td><td>DB 접근 (TypeORM)</td><td>Spring Data JPA</td><td><code>Repository&lt;Task&gt;</code></td></tr>
+          <tr><td><b>Guard</b></td><td>요청 통과 여부 (인증/인가)</td><td>Security Filter</td><td><code>JwtAuthGuard</code></td></tr>
+          <tr><td><b>DTO + Pipe</b></td><td>요청 body 검증·변환</td><td>Bean Validation</td><td><code>CreateMemoItemDto</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>실제 컨트롤러 한 조각이 어떻게 읽히나</h3>
+    <pre><span class="c">// memo-items.controller.ts — 이 프로젝트 실제 코드</span>
+<span class="k">@Controller</span>(<span class="s">'memo-items'</span>)   <span class="c">// → 경로 /api/memo-items</span>
+<span class="k">@UseGuards</span>(JwtAuthGuard)  <span class="c">// 이 컨트롤러 전체에 JWT 인증 필수</span>
+<span class="k">export class</span> MemoItemsController {
+  <span class="k">constructor</span>(
+    <span class="k">@InjectRepository</span>(MemoItem)          <span class="c">// DI로 리포지토리 주입</span>
+    <span class="k">private readonly</span> items: Repository&lt;MemoItem&gt;,
+  ) {}
+
+  <span class="k">@Patch</span>(<span class="s">':id'</span>)                        <span class="c">// PATCH /api/memo-items/3</span>
+  <span class="k">async</span> update(<span class="k">@Param</span>(<span class="s">'id'</span>) id, <span class="k">@Body</span>() dto: UpdateMemoItemDto) {
+    <span class="c">// dto는 Pipe가 이미 검증함. 여기선 로직만.</span>
+  }
+}</pre>
+    <p class="muted">경로 앞에 <code>/api</code>가 붙는 건 <code>main.ts</code>의 <code>app.setGlobalPrefix('api')</code> 때문이야. 포트는 <code>5004</code>.</p>
+  </section>
+
+  <!-- 3. Request flow -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>요청 한 건이 흐르는 길</h2></div>
+    <p>프론트가 API를 부르면 서버 안에서 이 순서로 지나가. 읽을 때 이 흐름을 따라가면 길을 안 잃어.</p>
+    <div class="flow">
+      <div class="step"><div class="n">entry</div><div class="t">main.ts</div><div class="d">prefix·CORS·Pipe</div></div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="n">route</div><div class="t">Controller</div><div class="d">@Patch(':id')</div></div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="n">gate</div><div class="t">Guard</div><div class="d">JWT 검증</div></div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="n">check</div><div class="t">DTO Pipe</div><div class="d">body 검증</div></div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="n">logic</div><div class="t">Service</div><div class="d">비즈니스</div></div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="n">data</div><div class="t">Repository</div><div class="d">MySQL</div></div>
+    </div>
+    <div class="note take">
+      <span class="lbl">함정 하나</span>
+      <code>ValidationPipe({ whitelist: true })</code>라서 <b>DTO에 선언 안 된 필드는 조용히 버려져</b>(400 아님). 새 컬럼을 추가했는데 반영이 안 되면, 십중팔구 DTO에 그 필드를 안 넣었거나 백엔드를 재빌드 안 한 거야.
+    </div>
+  </section>
+
+  <!-- 4. Project structure -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>이 프로젝트의 분류 방식</h2></div>
+    <p>코드는 <span class="kicker">기능(도메인)별 모듈</span>로 나뉘어 있어. 폴더 하나 = 한 관심사, 그 안에 <code>entity · controller · service · dto</code>가 같이 있어. “한 도메인을 이해하려면 그 폴더만 보면 된다”가 핵심.</p>
+    <pre>backend/src/
+├─ <span class="k">main.ts</span>            <span class="c">// 부팅: 포트 5004, /api, CORS, ValidationPipe</span>
+├─ <span class="k">app.module.ts</span>      <span class="c">// 루트 모듈 (DB 연결 + 하위 모듈 조립)</span>
+├─ auth/              <span class="c">// 인증 도메인</span>
+│   ├─ auth.service.ts       <span class="c">// 로그인·회원가입·비번 (bcrypt)</span>
+│   ├─ auth.controller.ts
+│   ├─ auth.dto.ts
+│   └─ jwt-auth.guard.ts     <span class="c">// 토큰 검사</span>
+├─ users/
+│   └─ user.entity.ts
+└─ tasks/             <span class="c">// 스케줄 도메인 전체 (가장 큼)</span>
+    ├─ task.entity.ts + tasks.controller.ts + tasks.service.ts
+    ├─ memo-item.entity.ts   + memo-items.controller.ts
+    ├─ mind-topic / month-memo / week-item / period-item / recurring
+    └─ hidden-folder.entity.ts</pre>
+
+    <div class="note good">
+      <span class="lbl">“도메인으로 나누면 MSA가 쉽나?” — 솔직한 답</span>
+      <b>맞아, 하지만 이건 MSA가 아니라 “모듈러 모놀리식”이야.</b> 도메인별로 경계를 잘 그어두면 <u>나중에</u> 한 모듈을 떼서 별도 서비스로 만들기가 쉬워지는 건 사실이야. 그치만 지금 규모에선 <b>모놀리식이 정답</b>이고, 섣부른 MSA는 오히려 독이야(네트워크·트랜잭션·배포 복잡도 폭증). 지금처럼 <b>도메인 경계만 깔끔히</b> 유지 → 필요해지면 그때 분리, 이게 실무 정석이야.
+    </div>
+    <p class="muted">참고: 지금 <code>tasks</code> 모듈이 여러 컨트롤러를 다 안고 있어서 조금 비대해. 규모가 더 커지면 <code>memo</code>, <code>planning</code> 같은 서브모듈로 쪼개는 게 다음 리팩터링 후보야.</p>
+  </section>
+
+  <!-- 5. ERD -->
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>DB ERD</h2></div>
+    <p>테이블 9개. <span class="kicker">모든 테이블이 <code>users</code>에 매달려</span> 있고(실제 FK, <code>onDelete: CASCADE</code>), <code>tasks</code>는 여러 “소스” 테이블을 <b>논리적으로</b> 참조해(그냥 int 컬럼 — DB FK는 아님). 아래에서 실선은 진짜 FK, 점선 설명은 코드상 논리 참조야.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+erDiagram
+  users ||--o{ tasks : "1:N"
+  users ||--o{ memo_items : "1:N"
+  users ||--o{ month_memos : "1:N"
+  users ||--o{ mind_topics : "1:N"
+  users ||--o{ week_items : "1:N"
+  users ||--o{ period_items : "1:N"
+  users ||--o{ recurring_items : "1:N"
+  users ||--o{ hidden_folders : "1:N"
+
+  memo_items ||..o{ memo_items : "parentId (self)"
+  memo_items ||..o{ tasks : "subItemId (logical)"
+  recurring_items ||..o{ tasks : "recurringId (logical)"
+  week_items ||..o{ tasks : "weekItemId (logical)"
+  period_items ||..o{ tasks : "periodItemId (logical)"
+
+  users {
+    int id PK
+    string email UK
+    string password
+    string name
+  }
+  tasks {
+    int id PK
+    int userId FK
+    string title
+    string category
+    date date
+    bool completed
+    bool isChore
+    tinyint top3Order
+    int subItemId "→memo_items"
+    string startTime
+    string endTime
+    int position
+  }
+  memo_items {
+    int id PK
+    int userId FK
+    string month "YYYY-MM"
+    string category
+    string text
+    int parentId "→self"
+    text content
+    bool completed
+    bool assigned "폐기됨"
+    int position
+  }
+  month_memos {
+    int id PK
+    int userId FK
+    string month
+    string category
+    text content
+  }
+  mind_topics {
+    int id PK
+    int userId FK
+    string month "월 or 주"
+    string name
+    bool isFolder
+  }
+  week_items {
+    int id PK
+    int userId FK
+    date weekStart
+    string title
+    string category
+    string days "0,2,4"
+  }
+  period_items {
+    int id PK
+    int userId FK
+    date startDate
+    date endDate
+    string title
+    string category
+  }
+  recurring_items {
+    int id PK
+    int userId FK
+    string title
+    string category
+  }
+  hidden_folders {
+    int id PK
+    int userId FK
+    string month
+    string category
+  }
+      </pre>
+    </div>
+    <p class="cap">실선(||--o{) = 실제 FK · 점선(||..o{) = 코드상 논리 참조(FK 아님)</p>
+
+    <h3>테이블을 3덩어리로 이해하기</h3>
+    <ul class="clean">
+      <li><b>실행 단위</b> — <code>tasks</code>: 특정 날짜의 할일. 완료·타임박싱·Top3·Schedule이 다 여기.</li>
+      <li><b>생성 소스</b> — <code>recurring_items</code>(반복) · <code>week_items</code>(주간) · <code>period_items</code>(기간): 규칙에 따라 <code>tasks</code>를 자동 생성. 생성된 task는 <code>recurringId</code> 등으로 원본을 가리켜.</li>
+      <li><b>메모/기획</b> — <code>memo_items</code>(월×분류 항목, 상·하위 self 참조) · <code>month_memos</code>(월 메모) · <code>mind_topics</code>(집중 주제) · <code>hidden_folders</code>(숨긴 폴더).</li>
+    </ul>
+
+    <div class="note">
+      <span class="lbl">전 테이블 공통 패턴</span>
+      모든 테이블에 <code>createdAt</code>·<code>deletedAt</code>이 있어. <b>삭제는 물리 삭제가 아니라 soft delete</b>(<code>@DeleteDateColumn</code> → <code>deletedAt</code>에 시각 기록, TypeORM이 조회 시 자동 제외). 데이터는 안 지워지고 감춰질 뿐이야.
+    </div>
+  </section>
+
+  <hr class="soft" />
+
+  <!-- 6. Where to start -->
+  <section style="margin-top:0">
+    <div class="sec-head"><span class="sec-num">06</span><h2>어디서부터 읽으면 되나</h2></div>
+    <ul class="clean">
+      <li><span class="kicker">1.</span> <code>main.ts</code> → <code>app.module.ts</code>: 앱이 어떻게 조립되는지 (10분)</li>
+      <li><span class="kicker">2.</span> <code>auth/</code> 폴더 통째로: 가장 작고 완결된 도메인 — Nest 한 바퀴가 다 들어있어 (entity→dto→service→controller→guard)</li>
+      <li><span class="kicker">3.</span> <code>tasks/task.entity.ts</code> + <code>tasks.controller.ts</code>: 제일 중심 테이블</li>
+      <li><span class="kicker">4.</span> <code>memo-items.controller.ts</code>: 상·하위 self 참조 + 완료 전파 로직이 있어 실전 감각 잡기 좋아</li>
+    </ul>
+    <p class="muted">읽다가 데코레이터가 헷갈리면 “이건 스프링의 뭐랑 같지?”로 치환하면 대부분 풀려. 구조가 정말 닮았거든.</p>
+  </section>
+</div>
+</body>
+</html>
