@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:5004}
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:scheduler}?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+  flyway:
+    baseline-on-migrate: ${DB_BASELINE_ON_MIGRATE:false}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+scheduler:
+  jwt-secret: ${JWT_SECRET:dev-secret}
